@@ -2,254 +2,160 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>たまごタップ進化！</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Chicken Tap Game</title>
 
 <style>
 body{
 margin:0;
-font-family:sans-serif;
-background:#fff3c4;
 overflow:hidden;
-text-align:center;
+background:#87ceeb;
+font-family:sans-serif;
 }
 
-/* ===== 画面 ===== */
-.screen{
-display:none;
-height:100vh;
+#titleScreen{
+position:absolute;
+width:100%;
+height:100%;
+display:flex;
+flex-direction:column;
 justify-content:center;
 align-items:center;
-flex-direction:column;
+background:#87ceeb;
 }
 
-.show{
-display:flex;
-}
-
-h1{
-font-size:32px;
-margin-bottom:20px;
+#gameScreen{
+display:none;
 }
 
 button{
 font-size:20px;
-padding:15px 25px;
+padding:12px 24px;
 border:none;
-border-radius:15px;
-background:#ffb703;
-box-shadow:0 5px #c98a00;
-margin:8px;
+border-radius:10px;
+background:#ffcc00;
 }
 
-button:active{
-transform:translateY(4px);
-box-shadow:0 2px #c98a00;
-}
-
-/* ===== ゲーム ===== */
-
-#gameArea{
-position:relative;
-width:100%;
-height:60vh;
-overflow:hidden;
-}
-
-#egg{
+.enemy{
 position:absolute;
-width:min(45vw,200px);
-left:-200px;
-top:50%;
-transform-origin:center;
-cursor:pointer;
+width:80px;
 user-select:none;
-}
-
-/* ポヨン */
-@keyframes poyon{
-0%{scale:1;}
-40%{scale:1.25;}
-70%{scale:0.9;}
-100%{scale:1;}
-}
-
-.poyon{
-animation:poyon .25s;
-}
-
-/* 爆発 */
-@keyframes boom{
-0%{transform:scale(1);}
-50%{transform:scale(2);}
-100%{transform:scale(0);opacity:0;}
-}
-
-.boom{
-animation:boom .5s forwards;
-}
-
-#info{
-font-size:22px;
-margin-top:10px;
+touch-action:manipulation;
 }
 </style>
 </head>
 
 <body>
 
-<!-- タイトル -->
-<div id="title" class="screen show">
-<h1>🥚 たまごタップ進化！</h1>
-<p>逃げる前に進化させよう！</p>
-
-<button onclick="startGame(2)">ふつう</button>
-<button onclick="startGame(4)">はやい</button>
-<button onclick="startGame(6)">げきはや</button>
+<!-- タイトル画面 -->
+<div id="titleScreen">
+<h1>🐔 Chicken Tap</h1>
+<button onclick="startGame()">START</button>
 </div>
 
-<!-- ゲーム -->
-<div id="game" class="screen">
+<!-- ゲーム画面 -->
+<div id="gameScreen"></div>
 
-<div id="gameArea">
-<img id="egg" src="egg.png">
-</div>
-
-<div id="info">
-タップ数：<span id="tap">0</span>
-</div>
-
-<button onclick="goTitle()">タイトルへ</button>
-
-</div>
-
-<!-- 結果 -->
-<div id="result" class="screen">
-<h1 id="resultText"></h1>
-<button onclick="goTitle()">タイトルへ</button>
-</div>
+<audio id="tapSound"
+src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
 
 <script>
+const game=document.getElementById("gameScreen");
+const title=document.getElementById("titleScreen");
+const sound=document.getElementById("tapSound");
 
-const forms=[
-"egg.png",
-"chick.png",
-"chicken.png",
-"meat.png"
-];
-
-let stage=0;
-let taps=0;
-let x=-200;
-let rotation=0;
-let speed=2;
 let playing=false;
+let spawnLoop;
 
-const egg=document.getElementById("egg");
-
-/* ===== 画面切替 ===== */
-
-function show(id){
-document.querySelectorAll(".screen")
-.forEach(s=>s.classList.remove("show"));
-document.getElementById(id).classList.add("show");
-}
-
-function goTitle(){
-playing=false;
-show("title");
-}
-
-/* ===== ポヨン ===== */
-
-function poyon(){
-egg.classList.remove("poyon");
-void egg.offsetWidth;
-egg.classList.add("poyon");
-}
-
-/* ===== 開始 ===== */
-
-function startGame(sp){
-speed=sp;
-stage=0;
-taps=0;
-x=-200;
-rotation=0;
-
-egg.src=forms[0];
-egg.classList.remove("boom");
-
-document.getElementById("tap").textContent=0;
-
-show("game");
+/* ===== ゲーム開始 ===== */
+function startGame(){
+title.style.display="none";
+game.style.display="block";
 playing=true;
-requestAnimationFrame(loop);
+spawnEnemies();
 }
 
-/* ===== タップ ===== */
+/* ===== タイトルへ戻る ===== */
+function backToTitle(){
+playing=false;
+clearInterval(spawnLoop);
+game.innerHTML="";
+game.style.display="none";
+title.style.display="flex";
+}
 
-egg.addEventListener("click",()=>{
-
+/* ===== 敵生成（2〜3体） ===== */
+function spawnEnemies(){
+spawnLoop=setInterval(()=>{
 if(!playing) return;
 
-taps++;
-document.getElementById("tap").textContent=taps;
+const count=2+Math.floor(Math.random()*2);
 
-poyon();
-
-if(taps===3) evolve(1);
-if(taps===6) evolve(2);
-if(taps===10){
-evolve(3);
-explode();
+for(let i=0;i<count;i++){
+createEnemy();
 }
 
-});
-
-function evolve(n){
-stage=n;
-egg.src=forms[n];
-poyon();
+},1200);
 }
 
-/* ===== 成功 ===== */
+/* ===== 敵1体 ===== */
+function createEnemy(){
 
-function explode(){
-playing=false;
+const enemy=document.createElement("img");
+enemy.src="chicken.png"; // ←画像名
+enemy.className="enemy";
 
-egg.classList.remove("poyon");
-egg.classList.add("boom");
+const startX=Math.random()*(window.innerWidth-80);
 
-setTimeout(()=>{
-document.getElementById("resultText").textContent=
-"🍗 完成！やったね！";
-show("result");
-},600);
-}
+let y=-100;
+let rotation=0;
 
-/* ===== ループ ===== */
+enemy.style.left=startX+"px";
+enemy.style.top=y+"px";
 
-function loop(){
+game.appendChild(enemy);
 
-if(!playing) return;
+/* タップ（音のみ） */
+enemy.onclick=()=>{
+sound.currentTime=0;
+sound.play();
+enemy.remove();
+};
 
-x+=speed;
-rotation+=4+stage*2;
+/* 直線落下＋自転 */
+const speed=3+Math.random()*2;
+const spin=3+Math.random()*4;
 
-egg.style.transform=
-`translate(${x}px,-50%) rotate(${rotation}deg)`;
-
-if(x>window.innerWidth){
-playing=false;
-document.getElementById("resultText").textContent=
-"にげられた…😢";
-show("result");
+function move(){
+if(!playing){
+enemy.remove();
 return;
 }
 
-requestAnimationFrame(loop);
+y+=speed;
+rotation+=spin;
+
+enemy.style.top=y+"px";
+enemy.style.transform=`rotate(${rotation}deg)`;
+
+if(y<window.innerHeight+100){
+requestAnimationFrame(move);
+}else{
+enemy.remove();
 }
+}
+
+move();
+}
+
+/* ===== 戻るボタン ===== */
+const backBtn=document.createElement("button");
+backBtn.textContent="タイトルへ戻る";
+backBtn.style.position="absolute";
+backBtn.style.top="10px";
+backBtn.style.left="10px";
+backBtn.onclick=backToTitle;
+document.body.appendChild(backBtn);
 
 </script>
 
