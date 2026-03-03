@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>たまごタップ進化！</title>
+
+<style>
+body{
+margin:0;
+font-family:sans-serif;
+background:#fff3c4;
+overflow:hidden;
+text-align:center;
+}
+
+/* ===== 画面 ===== */
+.screen{
+display:none;
+height:100vh;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+}
+
+.show{
+display:flex;
+}
+
+h1{
+font-size:32px;
+margin-bottom:20px;
+}
+
+button{
+font-size:20px;
+padding:15px 25px;
+border:none;
+border-radius:15px;
+background:#ffb703;
+box-shadow:0 5px #c98a00;
+margin:8px;
+}
+
+button:active{
+transform:translateY(4px);
+box-shadow:0 2px #c98a00;
+}
+
+/* ===== ゲーム ===== */
+
+#gameArea{
+position:relative;
+width:100%;
+height:60vh;
+overflow:hidden;
+}
+
+#egg{
+position:absolute;
+width:min(45vw,200px);
+left:-200px;
+top:50%;
+transform-origin:center;
+cursor:pointer;
+user-select:none;
+}
+
+/* ポヨン */
+@keyframes poyon{
+0%{scale:1;}
+40%{scale:1.25;}
+70%{scale:0.9;}
+100%{scale:1;}
+}
+
+.poyon{
+animation:poyon .25s;
+}
+
+/* 爆発 */
+@keyframes boom{
+0%{transform:scale(1);}
+50%{transform:scale(2);}
+100%{transform:scale(0);opacity:0;}
+}
+
+.boom{
+animation:boom .5s forwards;
+}
+
+#info{
+font-size:22px;
+margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- タイトル -->
+<div id="title" class="screen show">
+<h1>🥚 たまごタップ進化！</h1>
+<p>逃げる前に進化させよう！</p>
+
+<button onclick="startGame(2)">ふつう</button>
+<button onclick="startGame(4)">はやい</button>
+<button onclick="startGame(6)">げきはや</button>
+</div>
+
+<!-- ゲーム -->
+<div id="game" class="screen">
+
+<div id="gameArea">
+<img id="egg" src="egg.png">
+</div>
+
+<div id="info">
+タップ数：<span id="tap">0</span>
+</div>
+
+<button onclick="goTitle()">タイトルへ</button>
+
+</div>
+
+<!-- 結果 -->
+<div id="result" class="screen">
+<h1 id="resultText"></h1>
+<button onclick="goTitle()">タイトルへ</button>
+</div>
+
+<script>
+
+const forms=[
+"egg.png",
+"chick.png",
+"chicken.png",
+"meat.png"
+];
+
+let stage=0;
+let taps=0;
+let x=-200;
+let rotation=0;
+let speed=2;
+let playing=false;
+
+const egg=document.getElementById("egg");
+
+/* ===== 画面切替 ===== */
+
+function show(id){
+document.querySelectorAll(".screen")
+.forEach(s=>s.classList.remove("show"));
+document.getElementById(id).classList.add("show");
+}
+
+function goTitle(){
+playing=false;
+show("title");
+}
+
+/* ===== ポヨン ===== */
+
+function poyon(){
+egg.classList.remove("poyon");
+void egg.offsetWidth;
+egg.classList.add("poyon");
+}
+
+/* ===== 開始 ===== */
+
+function startGame(sp){
+speed=sp;
+stage=0;
+taps=0;
+x=-200;
+rotation=0;
+
+egg.src=forms[0];
+egg.classList.remove("boom");
+
+document.getElementById("tap").textContent=0;
+
+show("game");
+playing=true;
+requestAnimationFrame(loop);
+}
+
+/* ===== タップ ===== */
+
+egg.addEventListener("click",()=>{
+
+if(!playing) return;
+
+taps++;
+document.getElementById("tap").textContent=taps;
+
+poyon();
+
+if(taps===3) evolve(1);
+if(taps===6) evolve(2);
+if(taps===10){
+evolve(3);
+explode();
+}
+
+});
+
+function evolve(n){
+stage=n;
+egg.src=forms[n];
+poyon();
+}
+
+/* ===== 成功 ===== */
+
+function explode(){
+playing=false;
+
+egg.classList.remove("poyon");
+egg.classList.add("boom");
+
+setTimeout(()=>{
+document.getElementById("resultText").textContent=
+"🍗 完成！やったね！";
+show("result");
+},600);
+}
+
+/* ===== ループ ===== */
+
+function loop(){
+
+if(!playing) return;
+
+x+=speed;
+rotation+=4+stage*2;
+
+egg.style.transform=
+`translate(${x}px,-50%) rotate(${rotation}deg)`;
+
+if(x>window.innerWidth){
+playing=false;
+document.getElementById("resultText").textContent=
+"にげられた…😢";
+show("result");
+return;
+}
+
+requestAnimationFrame(loop);
+}
+
+</script>
+
+</body>
+</html>
