@@ -1,163 +1,294 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Chicken Tap Game</title>
+<title>チキンタップ30秒チャレンジ</title>
 
 <style>
-body{
-margin:0;
-overflow:hidden;
-background:#87ceeb;
-font-family:sans-serif;
-}
+body{margin:0;background:#87ceeb;overflow:hidden;font-family:sans-serif;}
 
-#titleScreen{
-position:absolute;
-width:100%;
-height:100%;
-display:flex;
-flex-direction:column;
-justify-content:center;
-align-items:center;
-background:#87ceeb;
-}
-
-#gameScreen{
-display:none;
+#title,#result{
+position:absolute;width:100%;height:100%;
+display:flex;flex-direction:column;
+justify-content:center;align-items:center;
+background:#fff3cd;z-index:10;
 }
 
 button{
-font-size:20px;
-padding:12px 24px;
-border:none;
-border-radius:10px;
-background:#ffcc00;
+font-size:22px;padding:12px 25px;
+border-radius:12px;border:none;
+background:#ffb703;margin-top:10px;
 }
 
-.enemy{
+#ui{
+position:absolute;top:10px;right:10px;
+font-size:22px;color:white;
+text-shadow:2px 2px 4px black;
+}
+
+.sparkle{
 position:absolute;
-width:80px;
-user-select:none;
-touch-action:manipulation;
+font-size:18px;
+pointer-events:none;
+animation:spark 1s linear infinite;
+}
+
+@keyframes spark{
+0%{transform:translate(0,0);}
+50%{transform:translate(5px,-5px);}
+100%{transform:translate(0,0);}
+}
+
+.explosion{
+position:absolute;font-size:50px;
+pointer-events:none;
+animation:boom .4s forwards;
+}
+
+@keyframes boom{
+0%{transform:scale(.5);opacity:1;}
+100%{transform:scale(2);opacity:0;}
 }
 </style>
 </head>
 
 <body>
 
-<!-- タイトル画面 -->
-<div id="titleScreen">
-<h1>🐔 Chicken Tap</h1>
+<div id="title">
+<h1>🐔 チキンタップ</h1>
 <button onclick="startGame()">START</button>
 </div>
 
-<!-- ゲーム画面 -->
-<div id="gameScreen"></div>
+<div id="result" style="display:none"></div>
 
-<audio id="tapSound"
-src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<div id="ui">
+⏱ <span id="time">30</span><br>
+🏆 <span id="score">0</span>
+</div>
+
+<canvas id="game"></canvas>
+
+<audio id="tapSound" src="tap.mp3"></audio>
+<audio id="boomSound" src="boom.mp3"></audio>
+<audio id="bgm" src="bgm.mp3" loop></audio>
 
 <script>
-const game=document.getElementById("gameScreen");
-const title=document.getElementById("titleScreen");
-const sound=document.getElementById("tapSound");
+const canvas=game;
+const ctx=canvas.getContext("2d");
+canvas.width=innerWidth;
+canvas.height=innerHeight;
 
-let playing=false;
-let spawnLoop;
+const img={
+egg:new Image(),
+gold:new Image(),
+chick:new Image(),
+chicken:new Image(),
+meat:new Image()
+};
 
-/* ===== ゲーム開始 ===== */
-function startGame(){
-title.style.display="none";
-game.style.display="block";
-playing=true;
-spawnEnemies();
+img.egg.src="egg.png";
+img.gold.src="gold_egg.png";
+img.chick.src="chick.png";
+img.chicken.src="chicken.png";
+img.meat.src="meat.png";
+
+const tapSound=document.getElementById("tapSound");
+const boomSound=document.getElementById("boomSound");
+const bgm=document.getElementById("bgm");
+
+let objs=[];
+let running=false;
+let score=0;
+let time=30;
+let timer;
+
+const points={
+egg:10,
+gold:20,
+chick:5,
+chicken:2
+};
+
+function randType(){
+let r=Math.random();
+if(r<0.08) return "gold";
+if(r<0.4) return "egg";
+if(r<0.7) return "chick";
+return "chicken";
 }
 
-/* ===== タイトルへ戻る ===== */
-function backToTitle(){
-playing=false;
-clearInterval(spawnLoop);
-game.innerHTML="";
-game.style.display="none";
+function spawn(){
+let n=2+Math.floor(Math.random()*2);
+
+for(let i=0;i<n;i++){
+let type=randType();
+
+objs.push({
+x:Math.random()*canvas.width,
+y:-80,
+origin:type,
+stage:(type==="egg"||type==="gold")?0:(type==="chick"?1:2),
+speed:2+Math.random()*2,
+angle:0,
+rot:(Math.random()*0.1)+0.02
+});
+}
+}
+
+function startGame(){
+title.style.display="none";
+result.style.display="none";
+
+score=0;
+time=30;
+objs=[];
+running=true;
+
+bgm.currentTime=0;
+bgm.playbackRate=1;
+bgm.play();
+
+timer=setInterval(()=>{
+time--;
+timeEl.textContent=time;
+
+if(time<=5){
+bgm.playbackRate=1.4; // ★ラスト加速
+}
+
+if(time<=0) endGame();
+},1000);
+
+loop();
+}
+
+function endGame(){
+running=false;
+clearInterval(timer);
+bgm.pause();
+
+let high=localStorage.getItem("highscore")||0;
+if(score>high){
+high=score;
+localStorage.setItem("highscore",score);
+}
+
+result.innerHTML=
+`<h2>RESULT</h2>
+<p>Score: ${score}</p>
+<p>HighScore: ${high}</p>
+<button onclick="startGame()">もう一回</button>
+<button onclick="backTitle()">タイトルへ</button>`;
+
+result.style.display="flex";
+}
+
+function backTitle(){
+result.style.display="none";
 title.style.display="flex";
 }
 
-/* ===== 敵生成（2〜3体） ===== */
-function spawnEnemies(){
-spawnLoop=setInterval(()=>{
-if(!playing) return;
+canvas.addEventListener("click",e=>{
+const r=canvas.getBoundingClientRect();
+const mx=e.clientX-r.left;
+const my=e.clientY-r.top;
 
-const count=2+Math.floor(Math.random()*2);
+objs.forEach(o=>{
+let s=80;
 
-for(let i=0;i<count;i++){
-createEnemy();
+if(mx>o.x-s/2&&mx<o.x+s/2&&my>o.y-s/2&&my<o.y+s/2){
+
+tapSound.currentTime=0;
+tapSound.play();
+
+o.stage++;
+
+if(o.stage===3){
+explode(o.x,o.y);
+boomSound.currentTime=0;
+boomSound.play();
+
+score+=points[o.origin];
+scoreEl.textContent=score;
 }
 
-},1200);
+if(o.stage>3)o.remove=true;
+}
+});
+});
+
+function explode(x,y){
+const e=document.createElement("div");
+e.className="explosion";
+e.textContent="💥";
+e.style.left=(x-25)+"px";
+e.style.top=(y-25)+"px";
+document.body.appendChild(e);
+setTimeout(()=>e.remove(),400);
 }
 
-/* ===== 敵1体 ===== */
-function createEnemy(){
-
-const enemy=document.createElement("img");
-enemy.src="chicken.png"; // ←画像名
-enemy.className="enemy";
-
-const startX=Math.random()*(window.innerWidth-80);
-
-let y=-100;
-let rotation=0;
-
-enemy.style.left=startX+"px";
-enemy.style.top=y+"px";
-
-game.appendChild(enemy);
-
-/* タップ（音のみ） */
-enemy.onclick=()=>{
-sound.currentTime=0;
-sound.play();
-enemy.remove();
-};
-
-/* 直線落下＋自転 */
-const speed=3+Math.random()*2;
-const spin=3+Math.random()*4;
-
-function move(){
-if(!playing){
-enemy.remove();
-return;
+function sparkle(x,y){
+const s=document.createElement("div");
+s.className="sparkle";
+s.textContent="✨";
+s.style.left=x+"px";
+s.style.top=y+"px";
+document.body.appendChild(s);
+setTimeout(()=>s.remove(),1000);
 }
 
-y+=speed;
-rotation+=spin;
+function update(){
+objs.forEach(o=>{
+o.y+=o.speed;
+o.angle+=o.rot;
 
-enemy.style.top=y+"px";
-enemy.style.transform=`rotate(${rotation}deg)`;
+if(o.origin==="gold" && Math.random()<0.1){
+sparkle(o.x,o.y);
+}
 
-if(y<window.innerHeight+100){
-requestAnimationFrame(move);
+if(o.y>canvas.height+80)o.remove=true;
+});
+
+objs=objs.filter(o=>!o.remove);
+
+if(Math.random()<0.04)spawn();
+}
+
+function draw(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+objs.forEach(o=>{
+ctx.save();
+ctx.translate(o.x,o.y);
+ctx.rotate(o.angle);
+
+let image;
+if(o.stage===0){
+image=(o.origin==="gold")?img.gold:img.egg;
+}else if(o.stage===1){
+image=img.chick;
+}else if(o.stage===2){
+image=img.chicken;
 }else{
-enemy.remove();
-}
-}
-
-move();
+image=img.meat;
 }
 
-/* ===== 戻るボタン ===== */
-const backBtn=document.createElement("button");
-backBtn.textContent="タイトルへ戻る";
-backBtn.style.position="absolute";
-backBtn.style.top="10px";
-backBtn.style.left="10px";
-backBtn.onclick=backToTitle;
-document.body.appendChild(backBtn);
+ctx.drawImage(image,-40,-40,80,80);
+ctx.restore();
+});
+}
 
+const timeEl=document.getElementById("time");
+const scoreEl=document.getElementById("score");
+const title=document.getElementById("title");
+const result=document.getElementById("result");
+
+function loop(){
+if(!running)return;
+update();
+draw();
+requestAnimationFrame(loop);
+}
 </script>
-
 </body>
 </html>
